@@ -1,0 +1,34 @@
+cabal-vendor is tool for vendoring dependencies of cabal package into local repo
+
+How to use:
+1. Create local repo with cabal-vendor (--tarball for sdist archieve or --project
+   dir for unpacked one)
+
+2. Replace {BUILDDIR} in local-repo/config with absolute path to local-repo
+
+   For example:
+   sed -i "s|{BUILDDIR}|$PWD|" local-repo/config
+
+3. Run command
+   cabal --config local-repo/config build
+
+4. Profit!
+
+Usage: cabal-vendor [OPTIONS]
+
+cabal-vendor sets up a local repo with cabal package dependencies
+
+Useful for vendoring and local builds
+
+OPTIONS:
+  Packaging:
+    / --from-current-dir (default)        Create repo for project in current dir
+    | --project-dir      DIR              Use project located in DIR
+    \ --tarball          FILE.tar.gz      Use project from sdist tarball
+
+  Output:
+      --output-mode  dir, tarball         Format of output repo (default: dir)
+      --output-dir   DIR                  Write result to DIR (default: $PWD)
+
+  General:
+      --help, -h                          Show this message
