@@ -6,8 +6,6 @@ alias popd="popd >/dev/null"
 
 PROG_NAME="cabal-vendor"
 
-REPO_NAME="local-repo"
-
 # Available modes are current_dir, specified_dir, tarball
 PACKAGE_MODE="current_dir"
 AVAILABLE_PACKAGE_MODE="current_dir specified_dir tarball"
@@ -20,10 +18,10 @@ AVAILABLE_OUTPUT_MODE="dir tarball"
 
 OUTPUT_DIR="$PWD"
 
-function help()
+help()
 {
 cat << EOF
-Usage: $0 [OPTIONS]
+Usage: $(basename $0) [OPTIONS]
 
 $PROG_NAME sets up a local repo with cabal package dependencies
 
@@ -44,7 +42,7 @@ OPTIONS:
 EOF
 }
 
-function printerr() { printf "$PROG_NAME:\t %b\n" "$*" >&2; }
+printerr() { printf "$PROG_NAME:\t %b\n" "$*" >&2; }
 
 while [ "$1" != "" ]
 do
@@ -52,13 +50,13 @@ do
     "--output-mode" )
                 if [ -n "$2" ]
                 then
-                    echo "$AVAILABLE_OUTPUT_MODES" | grep -q -Fwe "$2" ||
-                         (printerr "Unknown output mode $2.\n\nAvailable modes are: $AVAILABLE_OUTPUT_MODES";
+                    echo "$AVAILABLE_OUTPUT_MODE" | grep -q -Fwe "$2" ||
+                         (printerr "Unknown output mode $2.\n\nAvailable modes are: $AVAILABLE_OUTPUT_MODE";
                           exit 1;)
 
                     OUTPUT_MODE="$2"
                 else
-                    printerr "Please, specify the output mode for $1 option.\n\nAvailable modes are: $AVAILABLE_OUTPUT_MODES"
+                    printerr "Please, specify the output mode for $1 option.\n\nAvailable modes are: $AVAILABLE_OUTPUT_MODE"
                     exit 1
                 fi;
                 shift;shift;;
@@ -111,13 +109,13 @@ do
 done
 
 
-function run_check_mode_current_dir()
+run_check_mode_current_dir()
 {
     [ -z "$PACKAGE_FILE" ] || (printerr "Impossible happened! Non empty variable \$PACKAGE_FILE for $PACKAGE_MODE mode!"
                                exit 1;)
 }
 
-function run_check_mode_specified_dir()
+run_check_mode_specified_dir()
 {
     [ -n "$PACKAGE_FILE" ] || (printerr "Impossible happened! Empty variable \$PACKAGE_FILE for $PACKAGE_MODE mode!"
                                exit 1;)
@@ -127,7 +125,7 @@ function run_check_mode_specified_dir()
 
 }
 
-function run_check_mode_tarball()
+run_check_mode_tarball()
 {
     [ -n "$PACKAGE_FILE" ] || (printerr "Impossible happened! Empty variable \$PACKAGE_FILE for $PACKAGE_MODE mode!"
                                exit 1;)
@@ -136,7 +134,7 @@ function run_check_mode_tarball()
     [ -f "$PACKAGE_FILE" ] || (printerr "$PACKAGE_FILE is not a file"; exit 1;)
 }
 
-function run_check_mode()
+run_check_mode()
 {
     echo "$AVAILABLE_PACKAGE_MODE"  |
         grep -q -Fwe "$PACKAGE_MODE" ||
@@ -151,19 +149,19 @@ function run_check_mode()
     run_check_mode_"$PACKAGE_MODE"
 }
 
-function run_check_project_correctness_current_dir()
+run_check_project_correctness_current_dir()
 {
     cabal info . > /dev/null
 }
 
-function run_check_project_correctness_specified_dir()
+run_check_project_correctness_specified_dir()
 {
     pushd "$PACKAGE_FILE"
     run_check_project_correctness_current_dir
     popd
 }
 
-function run_check_project_correctness_tarball()
+run_check_project_correctness_tarball()
 {
     echo "$PACKAGE_FILE" | grep -q -e "tar.gz$" ||
                          ( printerr "$(basename "$PACKAGE_FILE") is not .tar.gz archieve!";
@@ -172,7 +170,7 @@ function run_check_project_correctness_tarball()
     cabal info "$PACKAGE_FILE" > /dev/null
 }
 
-function run_check_project_correctness()
+run_check_project_correctness()
 {
     run_check_project_correctness_"$PACKAGE_MODE"
 }
@@ -187,33 +185,33 @@ done
 WORKDIR="$(mktemp -t -d cabal_vendor.XXX)"
 echo "WORKDIR is $WORKDIR"
 
-trap "{ rm -rf --dir "$WORKDIR"; }" SIGINT SIGTERM ERR SIGQUIT
+trap "{ rm -rf --dir \"$WORKDIR\"; }" SIGINT SIGTERM ERR SIGQUIT
 
-function cabal_vendor_init_current_dir()
+cabal_vendor_init_current_dir()
 {
     return 0;
 }
 
-function cabal_vendor_init_specified_dir()
+cabal_vendor_init_specified_dir()
 {
-    cd $PACKAGE_FILE
+    cd "$PACKAGE_FILE"
     cabal_vendor_init_current_dir
 }
 
-function cabal_vendor_init_tarball()
+cabal_vendor_init_tarball()
 {
-    cd "$(cabal get --destdir $WORKDIR $PACKAGE_FILE | rev | cut -d' ' -f1 | rev)"
+    cd "$(cabal get --destdir "$WORKDIR" "$PACKAGE_FILE" | rev | cut -d' ' -f1 | rev)"
     cabal_vendor_init_current_dir
 }
 
-function cabal_vendor_init()
+cabal_vendor_init()
 {
     cabal_vendor_init_"$PACKAGE_MODE"
 }
 
-function cabal_vendor_create_config()
+cabal_vendor_create_config()
 {
-cat << EOF > $WORKDIR/config
+cat << EOF > "$WORKDIR/config"
 repository hackage.haskell.org
   url: http://hackage.haskell.org/
 
@@ -221,13 +219,13 @@ remote-repo-cache: $WORKDIR/cache
 EOF
 }
 
-function cabal_vendor_fetch()
+cabal_vendor_fetch()
 {
     cabal --config-file "$WORKDIR/config" update
     cabal --config-file "$WORKDIR/config" fetch .
 }
 
-function cabal_vendor_create_repo()
+cabal_vendor_create_repo()
 {
     mkdir -p "$WORKDIR/local-repo/repo"
 
@@ -242,20 +240,20 @@ repository local-repo
 EOF
 }
 
-function cabal_vendor_distribute_dir()
+cabal_vendor_distribute_dir()
 {
-    printf "$WORKDIR/local-repo"
+    echo "$WORKDIR/local-repo"
 }
 
-function cabal_vendor_distribute_tarball()
+cabal_vendor_distribute_tarball()
 {
-    push $WORKDIR
+    push "$WORKDIR"
     tar czf "$PWD/local-repo.tar.gz" local-repo > /dev/null
-    printf "$WORKDIR/local-repo.tar.gz"
+    echo "$WORKDIR/local-repo.tar.gz"
     popd
 }
 
-function cabal_vendor_distribute()
+cabal_vendor_distribute()
 {
     DIST=$(cabal_vendor_distribute_"$OUTPUT_MODE")
     mv "$DIST" "$OUTPUT_DIR"
