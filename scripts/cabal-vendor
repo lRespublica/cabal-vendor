@@ -236,7 +236,7 @@ cabal_vendor_create_repo()
 
 cat << EOF > "$WORKDIR/local-repo/config"
 repository local-repo
-  url: file://{BUILDDIR}/local-repo/repo
+  url: file+noindex://{BUILDDIR}/local-repo/repo
 EOF
 }
 
