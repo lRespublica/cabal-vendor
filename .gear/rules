@@ -1,0 +1,3 @@
+tar: scripts name=@name@-@version@
+copy: README
+copy: LICENSE
