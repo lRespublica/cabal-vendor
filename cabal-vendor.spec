@@ -36,3 +36,5 @@ cp -t . %SOURCE9 %SOURCE10
 %_bindir/cabal-vendor
 
 %changelog
+* Mon Apr 21 2025 Leonid Znamenok <respublica@altlinux.org> 1.0.0-alt1
+- Initial build for Sisyphus
