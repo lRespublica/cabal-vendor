@@ -247,7 +247,7 @@ cabal_vendor_distribute_dir()
 
 cabal_vendor_distribute_tarball()
 {
-    push "$WORKDIR"
+    pushd "$WORKDIR"
     tar czf "$PWD/local-repo.tar.gz" local-repo > /dev/null
     echo "$WORKDIR/local-repo.tar.gz"
     popd
