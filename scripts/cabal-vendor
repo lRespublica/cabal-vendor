@@ -18,6 +18,8 @@ AVAILABLE_OUTPUT_MODE="dir tarball"
 
 OUTPUT_DIR="$PWD"
 
+LAZY=""
+
 help()
 {
 cat << EOF
@@ -36,6 +38,9 @@ OPTIONS:
   Output:
       --output-mode  dir, tarball         Format of output repo (default: dir)
       --output-dir   DIR                  Write result to DIR (default: \$PWD)
+
+  Behaviour:
+      --lazy                              Do not remove WORKDIR
 
   General:
       --help, -h                          Show this message
@@ -102,7 +107,10 @@ do
                 fi;
                 shift;shift;;
 
-    "--help" | "-h" ) help;exit;;
+    --lazy ) LAZY="1";
+             shift;;
+
+    --help | -h ) help;exit;;
 
     *) printerr "$1 is not an option"; exit 1;;
     esac
@@ -185,7 +193,7 @@ done
 WORKDIR="$(mktemp -t -d cabal_vendor.XXX)"
 echo "WORKDIR is $WORKDIR"
 
-trap "{ rm -rf --dir \"$WORKDIR\"; }" SIGINT SIGTERM ERR SIGQUIT
+[ -n "$LAZY" ] || trap "{ rm -rf --dir \"$WORKDIR\"; }" EXIT
 
 cabal_vendor_init_current_dir()
 {
