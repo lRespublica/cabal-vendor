@@ -235,29 +235,37 @@ cabal_vendor_fetch()
 
 cabal_vendor_create_repo()
 {
-    mkdir -p "$WORKDIR/local-repo/repo"
+    tar_to_src()
+    {
+        local PKGID="$(tar --list -f "$1" | head -n1 | cut -d/ -f1)"
+        local PKGNAME="$(echo "$PKGID" | rev | cut -d- -f2- | rev)"
+        tar --extract -f "$1"
 
-    pushd "$WORKDIR/local-repo/repo"
+        pushd $PKGID
+        cabal get --package-description-only "$PKGID"
+        mv -f "$PKGID.cabal" "$PKGNAME.cabal"
+        popd
+    }
+    export -f tar_to_src
+
+    mkdir -p "$WORKDIR/vendor"
+
+    pushd "$WORKDIR/vendor"
     find "$WORKDIR/cache/hackage.haskell.org" -mindepth 1 -name "*[0-9].tar.gz" |
-            xargs -I {} sh -c "(cp -t . {}; cabal get --only-package-description {})"
+            xargs -n 1 sh -c 'tar_to_src $@' tar_to_src
     popd
-
-cat << EOF > "$WORKDIR/local-repo/config"
-repository local-repo
-  url: file+noindex://{BUILDDIR}/local-repo/repo
-EOF
 }
 
 cabal_vendor_distribute_dir()
 {
-    echo "$WORKDIR/local-repo"
+    echo "$WORKDIR/vendor"
 }
 
 cabal_vendor_distribute_tarball()
 {
     pushd "$WORKDIR"
-    tar czf "$PWD/local-repo.tar.gz" local-repo > /dev/null
-    echo "$WORKDIR/local-repo.tar.gz"
+    tar czf "$PWD/vendor.tar.gz" vendor > /dev/null
+    echo "$WORKDIR/vendor.tar.gz"
     popd
 }
 
