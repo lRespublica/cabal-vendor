@@ -1,0 +1,281 @@
+#!/bin/sh
+set -Eeo pipefail
+
+alias pushd="pushd >/dev/null"
+alias popd="popd >/dev/null"
+
+PROG_NAME="cabal-vendor fetch"
+
+# Available modes are current_dir, specified_dir, tarball
+PACKAGE_MODE="current_dir"
+AVAILABLE_PACKAGE_MODE="current_dir specified_dir tarball"
+
+PACKAGE_FILE=""
+
+# Available modes are to_dir, to_tarball
+OUTPUT_MODE="dir"
+AVAILABLE_OUTPUT_MODE="dir tarball"
+
+OUTPUT_DIR="$PWD"
+
+LAZY=""
+
+help()
+{
+cat << EOF
+Usage: $PROG_NAME [OPTIONS]
+
+$PROG_NAME sets up locally full source tree of all cabal package dependencies
+
+OPTIONS:
+  Packaging:
+    / --from-current-dir (default)        Create repo for project in current dir
+    | --project-dir      DIR              Use project located in DIR
+    \\ --tarball          FILE.tar.gz      Use project from sdist tarball
+
+  Output:
+      --output-mode  dir, tarball         Format of output repo (default: dir)
+      --output-dir   DIR                  Write result to DIR (default: \$PWD)
+
+  Behaviour:
+      --lazy                              Do not remove WORKDIR
+
+  General:
+      --help, -h                          Show this message
+EOF
+}
+
+printerr() { printf "$PROG_NAME:\t %b\n" "$*" >&2; }
+
+while [ "$1" != "" ]
+do
+    case "$1" in
+    "--output-mode" )
+                if [ -n "$2" ]
+                then
+                    echo "$AVAILABLE_OUTPUT_MODE" | grep -q -Fwe "$2" ||
+                         (printerr "Unknown output mode $2.\n\nAvailable modes are: $AVAILABLE_OUTPUT_MODE";
+                          exit 1;)
+
+                    OUTPUT_MODE="$2"
+                else
+                    printerr "Please, specify the output mode for $1 option.\n\nAvailable modes are: $AVAILABLE_OUTPUT_MODE"
+                    exit 1
+                fi;
+                shift;shift;;
+
+    "--output-dir" )
+                if [ -n "$2" ]
+                then
+                    [ -e "$2" ] || (printerr "$2 does not exist"; exit 1;)
+                    [ -d "$2" ] || (printerr "$2 is not a directory"; exit 1;)
+
+                    OUTPUT_DIR="$(realpath "$2")";
+                else
+                    printerr "Please, specify the output directory for $1 option"; exit 1;
+                fi;
+                shift;shift;;
+
+    "--from-current-dir" ) PACKAGE_MODE="current_dir";
+                shift;;
+
+    "--project-dir" )
+                if [ -n "$2" ]
+                then
+                    [ -e "$2" ] || (printerr "$2 does not exist"; exit 1;)
+                    [ -d "$2" ] || (printerr "$2 is not a directory"; exit 1;)
+
+                    PACKAGE_MODE="specified_dir"
+                    PACKAGE_FILE="$(realpath "$2")";
+                else
+                    printerr "Please, specify the directory for $1 option"; exit 1;
+                fi;
+                shift;shift;;
+
+    "--tarball" )
+                if [ -n "$2" ]
+                then
+                    [ -e "$2" ] || (printerr "$2 does not exist"; exit 1;)
+                    [ -f "$2" ] || (printerr "$2 is not a file"; exit 1;)
+
+                    PACKAGE_MODE="tarball"
+                    PACKAGE_FILE="$(realpath "$2")";
+                else
+                    printerr "Please, specify the file for $1 option"; exit 1;
+                fi;
+                shift;shift;;
+
+    --lazy ) LAZY="1";
+             shift;;
+
+    --help | -h ) help;exit;;
+
+    *) printerr "$1 is not an option"; exit 1;;
+    esac
+done
+
+
+run_check_mode_current_dir()
+{
+    [ -z "$PACKAGE_FILE" ] || (printerr "Impossible happened! Non empty variable \$PACKAGE_FILE for $PACKAGE_MODE mode!"
+                               exit 1;)
+}
+
+run_check_mode_specified_dir()
+{
+    [ -n "$PACKAGE_FILE" ] || (printerr "Impossible happened! Empty variable \$PACKAGE_FILE for $PACKAGE_MODE mode!"
+                               exit 1;)
+
+    [ -e "$PACKAGE_FILE" ] || (printerr "$PACKAGE_FILE does not exist"; exit 1;)
+    [ -d "$PACKAGE_FILE" ] || (printerr "$PACKAGE_FILE is not a directory"; exit 1;)
+
+}
+
+run_check_mode_tarball()
+{
+    [ -n "$PACKAGE_FILE" ] || (printerr "Impossible happened! Empty variable \$PACKAGE_FILE for $PACKAGE_MODE mode!"
+                               exit 1;)
+
+    [ -e "$PACKAGE_FILE" ] || (printerr "$PACKAGE_FILE does not exist"; exit 1;)
+    [ -f "$PACKAGE_FILE" ] || (printerr "$PACKAGE_FILE is not a file"; exit 1;)
+}
+
+run_check_mode()
+{
+    echo "$AVAILABLE_PACKAGE_MODE"  |
+        grep -q -Fwe "$PACKAGE_MODE" ||
+            (printerr "Impossible happened! Unknown package mode $PACKAGE_MODE"
+             exit 1;)
+
+    echo "$AVAILABLE_OUTPUT_MODE"  |
+        grep -q -Fwe "$OUTPUT_MODE" ||
+            (printerr "Impossible happened! Unknown output mode $OUTPUT_MODE"
+             exit 1;)
+
+    run_check_mode_"$PACKAGE_MODE"
+}
+
+run_check_project_correctness_current_dir()
+{
+    cabal info . > /dev/null
+}
+
+run_check_project_correctness_specified_dir()
+{
+    pushd "$PACKAGE_FILE"
+    run_check_project_correctness_current_dir
+    popd
+}
+
+run_check_project_correctness_tarball()
+{
+    echo "$PACKAGE_FILE" | grep -q -e "tar.gz$" ||
+                         ( printerr "$(basename "$PACKAGE_FILE") is not .tar.gz archieve!";
+                           exit 1; )
+
+    cabal info "$PACKAGE_FILE" > /dev/null
+}
+
+run_check_project_correctness()
+{
+    run_check_project_correctness_"$PACKAGE_MODE"
+}
+
+checks="mode project_correctness"
+
+for check in $checks
+do
+    run_check_"$check"
+done
+
+WORKDIR="$(mktemp -t -d cabal_vendor.XXX)"
+echo "WORKDIR is $WORKDIR"
+
+[ -n "$LAZY" ] || trap "{ rm -rf --dir \"$WORKDIR\"; }" EXIT
+
+cabal_vendor_init_current_dir()
+{
+    return 0;
+}
+
+cabal_vendor_init_specified_dir()
+{
+    cd "$PACKAGE_FILE"
+    cabal_vendor_init_current_dir
+}
+
+cabal_vendor_init_tarball()
+{
+    cd "$(cabal get --destdir "$WORKDIR" "$PACKAGE_FILE" | rev | cut -d' ' -f1 | rev)"
+    cabal_vendor_init_current_dir
+}
+
+cabal_vendor_init()
+{
+    cabal_vendor_init_"$PACKAGE_MODE"
+}
+
+cabal_vendor_create_config()
+{
+cat << EOF > "$WORKDIR/config"
+repository hackage.haskell.org
+  url: http://hackage.haskell.org/
+
+remote-repo-cache: $WORKDIR/cache
+EOF
+}
+
+cabal_vendor_fetch()
+{
+    cabal --config-file "$WORKDIR/config" update
+    cabal --config-file "$WORKDIR/config" fetch .
+}
+
+cabal_vendor_create_repo()
+{
+    tar_to_src()
+    {
+        local PKGID="$(tar --list -f "$1" | head -n1 | cut -d/ -f1)"
+        local PKGNAME="$(echo "$PKGID" | rev | cut -d- -f2- | rev)"
+        tar --extract -f "$1"
+
+        pushd $PKGID
+        cabal get --package-description-only "$PKGID"
+        mv -f "$PKGID.cabal" "$PKGNAME.cabal"
+        popd
+    }
+    export -f tar_to_src
+
+    mkdir -p "$WORKDIR/vendor"
+
+    pushd "$WORKDIR/vendor"
+    find "$WORKDIR/cache/hackage.haskell.org" -mindepth 1 -name "*[0-9].tar.gz" |
+            xargs -n 1 sh -c 'tar_to_src $@' tar_to_src
+    popd
+}
+
+cabal_vendor_distribute_dir()
+{
+    echo "$WORKDIR/vendor"
+}
+
+cabal_vendor_distribute_tarball()
+{
+    pushd "$WORKDIR"
+    tar czf "$PWD/vendor.tar.gz" vendor > /dev/null
+    echo "$WORKDIR/vendor.tar.gz"
+    popd
+}
+
+cabal_vendor_distribute()
+{
+    DIST=$(cabal_vendor_distribute_"$OUTPUT_MODE")
+    mv "$DIST" "$OUTPUT_DIR"
+}
+
+STAGES="init create_config fetch create_repo distribute"
+
+for stage in $STAGES
+do
+    cabal_vendor_"$stage"
+done
