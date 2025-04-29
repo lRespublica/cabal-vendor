@@ -267,10 +267,28 @@ cabal_vendor_distribute_tarball()
     popd
 }
 
+cabal_vendor_distribute_usage_dir()
+{
+    echo "cabal-vendor convert --vendor-dir $1"
+}
+
+cabal_vendor_distribute_usage_tarball()
+{
+    echo "tar -xzvf $1"
+    echo "cabal-vendor convert --vendor-dir vendor"
+}
+
 cabal_vendor_distribute()
 {
     DIST=$(cabal_vendor_distribute_"$OUTPUT_MODE")
     rsync -a --delete "$DIST" "$OUTPUT_DIR"
+
+    echo
+    echo "Fetching complete"
+    echo "The vendored repo is located at $OUTPUT_DIR/$(basename $DIST)"
+    echo ""
+    echo "You can use it with:"
+    cabal_vendor_distribute_usage_"$OUTPUT_MODE" "$OUTPUT_DIR/$(basename $DIST)"
 }
 
 STAGES="init create_config fetch create_repo distribute"
