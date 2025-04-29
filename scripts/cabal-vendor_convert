@@ -1,0 +1,142 @@
+#!/bin/sh
+set -Eeo pipefail
+
+PROG_NAME="cabal-vendor convert"
+
+VENDOR_DIR="$PWD/vendor"
+
+OUTPUT_DIR="$PWD"
+REPO_NAME="local-repo"
+
+VERBOSE="0"
+
+LAZY=""
+
+help()
+{
+cat << EOF
+Usage: $PROG_NAME [OPTIONS]
+
+$PROG_NAME generates a local Hackage-style repository from a vendor
+directory created by 'cabal-vendor fetch'
+
+Options:
+  Input:
+      --vendor-dir            Specify the vendor directory (default: \$PWD/vendor)
+
+  Output:
+      --repo-name             Set the name of the repository (default: local-repo)
+      --output-dir            Specify the output directory (default: \$PWD)
+
+  Behaviour:
+      --lazy                  Do not remove WORKDIR
+
+  General:
+      --verbose, -v           Provide detailed output
+      --help, -h              Show this message
+EOF
+}
+
+printerr() { printf "$PROG_NAME:\t %b\n" "$*" >&2; }
+
+while [ "$1" != "" ]
+do
+    case "$1" in
+    --vendor-dir )
+            [ -n "$2" ] || { printerr "Please, specify parameter for $1 option";
+                             exit 1; }
+            [ -e "$2" ] || { printerr "$2 does not exist"; exit 1; }
+            [ -d "$2" ] || { printerr "$2 is not a directory"; exit 1; }
+
+            VENDOR_DIR="$(realpath "$2")"
+            shift;shift;;
+
+    --output-dir )
+            [ -n "$2" ] || { printerr "Please, specify parameter for $1 option";
+                             exit 1; }
+            [ -e "$2" ] || { printerr "$2 does not exist"; exit 1; }
+            [ -d "$2" ] || { printerr "$2 is not a directory"; exit 1; }
+
+            OUTPUT_DIR="$(realpath "$2")"
+            shift;shift;;
+
+    --repo-name )
+            [ -n "$2" ] || { printerr "Please, specify parameter for $1 option";
+                             exit 1; }
+
+            REPO_NAME="$2"
+            shift;shift;;
+
+    --verbose | -v )
+            VERBOSE="1"
+            shift;;
+
+    --lazy )
+            LAZY="1";
+            shift;;
+
+    --help | -h ) help;exit;;
+
+    *) printerr "$1 is not an option"; exit 1;;
+    esac
+done
+
+# Init
+WORKDIR="$(mktemp -t -d cabal_vendor.XXX)"
+echo "WORKDIR is $WORKDIR"
+
+[ -n "$LAZY" ] || trap "{ rm -rf --dir \"$WORKDIR\"; }" EXIT
+
+mkdir -p "$WORKDIR/$REPO_NAME/repo"
+
+# Exporting vars for cabal_* functions
+export WORKDIR REPO_NAME VERBOSE PROG_NAME
+export -f printerr
+
+# Convert repo to tarballs
+cabal_sdist()
+{
+    cabal sdist --output-dir "$WORKDIR/$REPO_NAME/repo" \
+                --project-dir "$1" \
+                --verbose="$VERBOSE" \
+                all 2>/dev/null \
+   || { printerr "Cannot find cabal project in $(basename "$1")";
+        exit 1; }
+}
+export -f cabal_sdist
+
+find "$VENDOR_DIR" -maxdepth 1 -mindepth 1 -type d \
+     | xargs -n 1 sh -e -c 'cabal_sdist $@' cabal_sdist
+
+echo
+
+# Write .cabal description
+cabal_get()
+{
+   cabal get --destdir "$WORKDIR/$REPO_NAME/repo" \
+             --package-description-only \
+             --verbose="$VERBOSE" \
+             "$1" 2>/dev/null \
+   || { printerr "Cannot find cabal project in $(basename "$1")";
+        exit 1; }
+}
+export -f cabal_get
+
+find "$WORKDIR/$REPO_NAME/repo" -name "*[0-9].tar.gz" \
+    | xargs -n 1 sh -e -c 'cabal_get $@' cabal_get
+
+# Create config file
+cat << EOF > "$WORKDIR/$REPO_NAME/config"
+repository $REPO_NAME
+  url: file+noindex://$OUTPUT_DIR/$REPO_NAME/repo
+EOF
+
+# Distribute
+rsync -a --delete "$WORKDIR/$REPO_NAME/" "$OUTPUT_DIR/$REPO_NAME"
+
+echo
+echo "Conversion completed"
+echo "The repository is located at $OUTPUT_DIR/$REPO_NAME"
+echo
+echo "You can use it with:"
+echo "cabal --config-file $OUTPUT_DIR/$REPO_NAME/config"
