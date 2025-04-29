@@ -28,12 +28,12 @@ Useful for vendoring and local builds (with rpm-build-haskell-vendored)
 %setup
 
 %install
-install -pm 755 -D -t %buildroot/%_bindir cabal-vendor
+install -pm 755 -D -t %buildroot/%_bindir cabal-vendor*
 cp -t . %SOURCE9 %SOURCE10
 
 %files
 %doc README LICENSE
-%_bindir/cabal-vendor
+%_bindir/cabal-vendor*
 
 %changelog
 * Mon Apr 21 2025 Leonid Znamenok <respublica@altlinux.org> 1.0.0-alt1
