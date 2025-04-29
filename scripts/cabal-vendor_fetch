@@ -270,7 +270,7 @@ cabal_vendor_distribute_tarball()
 cabal_vendor_distribute()
 {
     DIST=$(cabal_vendor_distribute_"$OUTPUT_MODE")
-    mv "$DIST" "$OUTPUT_DIR"
+    rsync -a --delete "$DIST" "$OUTPUT_DIR"
 }
 
 STAGES="init create_config fetch create_repo distribute"
