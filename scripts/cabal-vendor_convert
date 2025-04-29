@@ -96,7 +96,8 @@ export -f printerr
 # Convert repo to tarballs
 cabal_sdist()
 {
-    cabal sdist --output-dir "$WORKDIR/$REPO_NAME/repo" \
+    cabal --config-file /dev/null \
+          sdist --output-dir "$WORKDIR/$REPO_NAME/repo" \
                 --project-dir "$1" \
                 --verbose="$VERBOSE" \
                 all 2>/dev/null \
@@ -113,7 +114,9 @@ echo
 # Write .cabal description
 cabal_get()
 {
-   cabal get --destdir "$WORKDIR/$REPO_NAME/repo" \
+   # --config-file /dev/null here for offline usage
+   cabal --config-file /dev/null \
+         get --destdir "$WORKDIR/$REPO_NAME/repo" \
              --package-description-only \
              --verbose="$VERBOSE" \
              "$1" 2>/dev/null \
