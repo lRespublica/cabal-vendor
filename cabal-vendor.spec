@@ -1,6 +1,6 @@
 Name: cabal-vendor
 
-Version: 1.0.0
+Version: 1.1.0
 Release: alt1
 
 Summary: tool for vendoring dependencies of cabal package
@@ -36,5 +36,8 @@ cp -t . %SOURCE9 %SOURCE10
 %_bindir/cabal-vendor*
 
 %changelog
+* Tue Apr 29 2025 Leonid Znamenok <respublica@altlinux.org> 1.1.0-alt1
+- New version 1.1.0
+
 * Mon Apr 21 2025 Leonid Znamenok <respublica@altlinux.org> 1.0.0-alt1
 - Initial build for Sisyphus
