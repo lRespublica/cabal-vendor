@@ -20,6 +20,8 @@ OUTPUT_DIR="$PWD"
 
 LAZY=""
 
+STRONG_FLAGS=""
+
 help()
 {
 cat << EOF
@@ -38,6 +40,8 @@ OPTIONS:
       --output-dir   DIR                  Write result to DIR (default: \$PWD)
 
   Behaviour:
+      --strong-flags                      Do not defer flag choices in cabal
+                                          fetch, use package flag defaults
       --lazy                              Do not remove WORKDIR
 
   General:
@@ -104,6 +108,9 @@ do
                     printerr "Please, specify the file for $1 option"; exit 1;
                 fi;
                 shift;shift;;
+
+    --strong-flags ) STRONG_FLAGS="--strong-flags";
+             shift;;
 
     --lazy ) LAZY="1";
              shift;;
@@ -228,7 +235,7 @@ EOF
 cabal_vendor_fetch()
 {
     cabal --config-file "$WORKDIR/config" update
-    cabal --config-file "$WORKDIR/config" fetch .
+    cabal --config-file "$WORKDIR/config" fetch $STRONG_FLAGS .
 }
 
 cabal_vendor_create_repo()
