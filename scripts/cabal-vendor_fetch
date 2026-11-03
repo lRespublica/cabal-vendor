@@ -22,6 +22,8 @@ LAZY=""
 
 STRONG_FLAGS=""
 
+CONSTRAINTS=""
+
 help()
 {
 cat << EOF
@@ -42,6 +44,9 @@ OPTIONS:
   Behaviour:
       --strong-flags                      Do not defer flag choices in cabal
                                           fetch, use package flag defaults
+  -c, --constraint CONSTRAINT             Specify constraints on a package
+                                          (version, installed/source, flags);
+                                          can be used multiple times
       --lazy                              Do not remove WORKDIR
 
   General:
@@ -108,6 +113,25 @@ do
                     printerr "Please, specify the file for $1 option"; exit 1;
                 fi;
                 shift;shift;;
+
+    "--constraint" | "-c" )
+                [ -n "$2" ] || { printerr "Please, specify constraint for $1 option";
+                                 exit 1; }
+                CONSTRAINTS="$CONSTRAINTS
+$2"
+                shift;shift;;
+
+    --constraint=* )
+                [ -n "${1#*=}" ] || { printerr "Please, specify non-empty constraint";
+                                      exit 1; }
+                CONSTRAINTS="$CONSTRAINTS
+${1#*=}"
+                shift;;
+
+    -c?* )
+                CONSTRAINTS="$CONSTRAINTS
+${1#-c}"
+                shift;;
 
     --strong-flags ) STRONG_FLAGS="--strong-flags";
              shift;;
@@ -229,6 +253,7 @@ repository hackage.haskell.org
   url: http://hackage.haskell.org/
 
 remote-repo-cache: $WORKDIR/cache
+store-dir: $WORKDIR/store
 EOF
 }
 
@@ -236,6 +261,19 @@ cabal_vendor_fetch()
 {
     cabal --config-file "$WORKDIR/config" update
     cabal --config-file "$WORKDIR/config" fetch $STRONG_FLAGS .
+    if [ -n "$CONSTRAINTS" ]
+    then
+        set --
+        [ -z "$STRONG_FLAGS" ] || set -- "$@" "$STRONG_FLAGS"
+        while IFS= read -r constraint
+        do
+            [ -z "$constraint" ] || set -- "$@" --constraint "$constraint"
+        done <<EOF
+$CONSTRAINTS
+EOF
+        cabal --config-file "$WORKDIR/config" build --only-download \
+              --builddir="$WORKDIR/dist-newstyle" "$@" .
+    fi
 }
 
 cabal_vendor_create_repo()
